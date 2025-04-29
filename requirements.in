@@ -1,0 +1,9 @@
+nltk
+langchain-chroma
+langchain-community
+pypdf
+streamlit
+docx2txt
+unstructured[md]
+fastapi
+fastapi[standard]
