@@ -7,6 +7,7 @@ DOC_DIR = os.getenv("DOC_DIR", "./uploaded_docs")
 CHATBOT_URL_ASK = os.getenv("CHATBOT_URL_ASK", "http://localhost:8000/agent")
 CHATBOT_URL_INGEST_DATA = os.getenv("CHATBOT_URL_DATA", "http://localhost:8000/ingest_data")
 CHATBOT_URL_REMOVE_DATA = os.getenv("CHATBOT_URL_DATA", "http://localhost:8000/remove_data")
+CHATBOT_URL_AVAILABLE_MODELS = os.getenv("CHATBOT_URL_AVAILABLE_MODELS", "http://localhost:8000/available_models")
 
 
 def list_uploaded_files():
@@ -76,6 +77,24 @@ with st.sidebar:
         """
     )
 
+    st.header("AI Model Selection")
+    if "model" not in st.session_state:
+        st.session_state.model = ""
+    
+    try:
+        response = requests.get(CHATBOT_URL_AVAILABLE_MODELS)
+        available_models = response.json()["models"]
+        selected_model = st.selectbox(
+            "Choose AI Model",
+            options=available_models,
+            help="Select the AI model to use for chat",
+        )
+        
+        if selected_model != st.session_state.model:
+          st.session_state.model = selected_model
+    except Exception as e:
+        st.error(f"Could not load available models: {str(e)}")
+
     st.header("Document Upload")
     with st.spinner("Processing new data..."):
         FileUploader()
@@ -140,8 +159,10 @@ if prompt := st.chat_input("What do you want to know?"):
     st.chat_message("user").markdown(prompt)
 
     st.session_state.messages.append({"role": "user", "output": prompt})
-
-    data = {"text": prompt}
+    if not st.session_state.model:
+        st.error("Please select a model to use.")
+        st.stop()
+    data = {"query": prompt, "llm": st.session_state.model}
 
     with st.spinner("Searching for an answer..."):
         try:

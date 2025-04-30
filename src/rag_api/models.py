@@ -2,7 +2,8 @@ from pydantic import BaseModel
 
 
 class QueryInput(BaseModel):
-    text: str
+    query: str
+    llm: str
 
 
 class QueryOutput(BaseModel):
@@ -16,3 +17,7 @@ class DataInput(BaseModel):
 
 class DataOutput(BaseModel):
     message: str
+
+
+class ModelOutput(BaseModel):
+    models: list[str]
