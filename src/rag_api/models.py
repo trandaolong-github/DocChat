@@ -12,7 +12,7 @@ class QueryOutput(BaseModel):
 
 
 class DataInput(BaseModel):
-    file_path: str
+    file_name: str
 
 
 class DataOutput(BaseModel):

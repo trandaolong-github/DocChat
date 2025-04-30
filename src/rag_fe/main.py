@@ -2,28 +2,43 @@ import os
 import requests
 import streamlit as st
 
-DOC_DIR = os.getenv("DOC_DIR", "./uploaded_docs")
 
 CHATBOT_URL_ASK = os.getenv("CHATBOT_URL_ASK", "http://localhost:8000/agent")
-CHATBOT_URL_INGEST_DATA = os.getenv("CHATBOT_URL_DATA", "http://localhost:8000/ingest_data")
-CHATBOT_URL_REMOVE_DATA = os.getenv("CHATBOT_URL_DATA", "http://localhost:8000/remove_data")
+CHATBOT_URL_INGEST_DATA = os.getenv("CHATBOT_URL_INGEST_DATA", "http://localhost:8000/ingest_data")
+CHATBOT_URL_REMOVE_DATA = os.getenv("CHATBOT_URL_REMOVE_DATA", "http://localhost:8000/remove_data")
 CHATBOT_URL_AVAILABLE_MODELS = os.getenv("CHATBOT_URL_AVAILABLE_MODELS", "http://localhost:8000/available_models")
+CHATBOT_URL_UPLOADED_FILES = os.getenv("CHATBOT_URL_UPLOADED_FILES", "http://localhost:8000/uploaded_files")
 
+# For frontend deploy on Streamlit Cloud
+# CHATBOT_URL_ASK = "https://antelope-flowing-partly.ngrok-free.app/agent"
+# CHATBOT_URL_INGEST_DATA = "https://antelope-flowing-partly.ngrok-free.app/ingest_data"
+# CHATBOT_URL_REMOVE_DATA = "https://antelope-flowing-partly.ngrok-free.app/remove_data"
+# CHATBOT_URL_AVAILABLE_MODELS = "https://antelope-flowing-partly.ngrok-free.app/available_models"
+# CHATBOT_URL_UPLOADED_FILES = "https://antelope-flowing-partly.ngrok-free.app/uploaded_files"
 
 def list_uploaded_files():
-    """List files in the uploaded_docs directory, excluding hidden system files."""
-    return [
-        f for f in os.listdir(DOC_DIR)
-        if os.path.isfile(os.path.join(DOC_DIR, f)) and not f.startswith('.')
-    ]
+    """List files in the uploaded_docs directory in server side."""
+    try:
+        resp = requests.get(CHATBOT_URL_UPLOADED_FILES)
+        resp.raise_for_status()
+        return resp.json()
+    except requests.exceptions.HTTPError as http_err:
+        st.error(f"HTTP error occurred: {http_err}")
+        return []
+    except Exception as e:
+        st.error(f"An error occurred: {str(e)}")
+        return []
 
 
-def data_processing(api_type, data):
+def data_processing(api_type, data, payload=None):
     api_mapping = {
         "ingested": CHATBOT_URL_INGEST_DATA,
         "removed": CHATBOT_URL_REMOVE_DATA,
     }
-    response = requests.post(api_mapping[api_type], json=data)
+    if api_type == "ingested":
+        response = requests.post(api_mapping[api_type], params=payload, files=data)
+    else:
+        response = requests.post(api_mapping[api_type], json=data)
     response.raise_for_status()
     st.success(f"Data {api_type} successfully!")
 
@@ -46,17 +61,19 @@ class FileUploader:
     def start_upload(self):
         """Start the file upload process."""
         if self.file_uploader is not None and st.session_state.get("allow_upload"):
-            file_path = os.path.join(DOC_DIR, self.file_uploader.name)
-            with open(file_path, "wb") as f:
-                f.write(self.file_uploader.getbuffer())
+            # file_path = os.path.join(DOC_DIR, self.file_uploader.name)
+            # with open(file_path, "wb") as f:
+            #     f.write(self.file_uploader.getbuffer())
+            content = self.file_uploader.getvalue()
 
             print(f"Calling ingest data api for {self.file_uploader.name}")
             try:
                 data_processing(
                     "ingested",
                     {
-                        "file_path": file_path,
+                        "content": content,
                     },
+                    {"file_name": self.file_uploader.name,}
                 )
                 return
             except requests.exceptions.HTTPError as http_err:
@@ -65,7 +82,6 @@ class FileUploader:
                 st.error(f"An error occurred: {str(e)}")
             finally:
                 st.session_state.allow_upload = False
-            os.remove(file_path)
 
 
 with st.sidebar:
@@ -112,19 +128,19 @@ with st.sidebar:
         
         if st.button("Remove Selected Files"):
             for file in files_to_delete:
-                file_path = os.path.join(DOC_DIR, file)
-                try:
-                    os.remove(file_path)
-                    st.session_state.files_to_remove.remove(file)
-                    st.success(f"Removed {file}")
-                except Exception as e:
-                    st.error(f"Error removing {file}: {e}")
+                # file_path = os.path.join(DOC_DIR, file)
+                # try:
+                #     os.remove(file_path)
+                #     st.session_state.files_to_remove.remove(file)
+                #     st.success(f"Removed {file}")
+                # except Exception as e:
+                #     st.error(f"Error removing {file}: {e}")
 
                 print(f"Calling remove data api for {file}")
                 data_processing(
                     "removed",
                     {
-                        "file_path": file_path
+                        "file_name": file
                     },
                 )
             st.rerun()
