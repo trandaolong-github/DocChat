@@ -3,8 +3,13 @@ import os
 from fastapi import FastAPI, HTTPException, UploadFile, File
 
 from src.rag_api.const import DOC_DIR
-from src.rag_api.data import is_data_available, store_data, remove_file_from_chromadb
-from src.rag_api.rag_core import get_available_models, get_qa_agent
+from src.rag_api.rag_core import (
+    get_available_models,
+    get_qa_agent,
+    is_data_available,
+    store_data,
+    remove_file_from_chromadb
+)
 from src.rag_api.models import DataInput, DataOutput, ModelOutput, QueryInput, QueryOutput
 
 
@@ -41,7 +46,6 @@ async def ingest_data(file_name: str, content: UploadFile = File(...)) -> DataOu
     print("Ingesting data")
     try:
         store_data(file_name, content)
-        #print(f"File {file_name} ingest info: {content}")
         return {"message": "Data stored successfully"}
     except ValueError as e:
         raise HTTPException(status_code=400, detail=f"Invalid file type: {str(e)}")

@@ -1,87 +1,12 @@
-import os
-import requests
 import streamlit as st
 
-
-CHATBOT_URL_ASK = os.getenv("CHATBOT_URL_ASK", "http://localhost:8000/agent")
-CHATBOT_URL_INGEST_DATA = os.getenv("CHATBOT_URL_INGEST_DATA", "http://localhost:8000/ingest_data")
-CHATBOT_URL_REMOVE_DATA = os.getenv("CHATBOT_URL_REMOVE_DATA", "http://localhost:8000/remove_data")
-CHATBOT_URL_AVAILABLE_MODELS = os.getenv("CHATBOT_URL_AVAILABLE_MODELS", "http://localhost:8000/available_models")
-CHATBOT_URL_UPLOADED_FILES = os.getenv("CHATBOT_URL_UPLOADED_FILES", "http://localhost:8000/uploaded_files")
-
-# For frontend deploy on Streamlit Cloud
-# CHATBOT_URL_ASK = "https://antelope-flowing-partly.ngrok-free.app/agent"
-# CHATBOT_URL_INGEST_DATA = "https://antelope-flowing-partly.ngrok-free.app/ingest_data"
-# CHATBOT_URL_REMOVE_DATA = "https://antelope-flowing-partly.ngrok-free.app/remove_data"
-# CHATBOT_URL_AVAILABLE_MODELS = "https://antelope-flowing-partly.ngrok-free.app/available_models"
-# CHATBOT_URL_UPLOADED_FILES = "https://antelope-flowing-partly.ngrok-free.app/uploaded_files"
-
-def list_uploaded_files():
-    """List files in the uploaded_docs directory in server side."""
-    try:
-        resp = requests.get(CHATBOT_URL_UPLOADED_FILES)
-        resp.raise_for_status()
-        return resp.json()
-    except requests.exceptions.HTTPError as http_err:
-        st.error(f"HTTP error occurred: {http_err}")
-        return []
-    except Exception as e:
-        st.error(f"An error occurred: {str(e)}")
-        return []
-
-
-def data_processing(api_type, data, payload=None):
-    api_mapping = {
-        "ingested": CHATBOT_URL_INGEST_DATA,
-        "removed": CHATBOT_URL_REMOVE_DATA,
-    }
-    if api_type == "ingested":
-        response = requests.post(api_mapping[api_type], params=payload, files=data)
-    else:
-        response = requests.post(api_mapping[api_type], json=data)
-    response.raise_for_status()
-    st.success(f"Data {api_type} successfully!")
-
-
-class FileUploader:
-    # This is to deal with a problem with the file uploader in Streamlit:
-    # every time you interact with any widget, the script is rerun
-    # and you risk uploading file again. Using a session state variable:
-    # allow_upload and on_change param of file_uploader to solve this.
-    def __init__(self):
-        self.file_uploader = st.file_uploader(
-            "Choose a document to upload", 
-            type=['pdf', 'txt', 'docx', 'md'],
-            help="Upload a document to chat with",
-            on_change=lambda: st.session_state.update({"allow_upload": True}),
-        )
-
-        self.start_upload()
-
-    def start_upload(self):
-        """Start the file upload process."""
-        if self.file_uploader is not None and st.session_state.get("allow_upload"):
-            # file_path = os.path.join(DOC_DIR, self.file_uploader.name)
-            # with open(file_path, "wb") as f:
-            #     f.write(self.file_uploader.getbuffer())
-            content = self.file_uploader.getvalue()
-
-            print(f"Calling ingest data api for {self.file_uploader.name}")
-            try:
-                data_processing(
-                    "ingested",
-                    {
-                        "content": content,
-                    },
-                    {"file_name": self.file_uploader.name,}
-                )
-                return
-            except requests.exceptions.HTTPError as http_err:
-                st.error(f"HTTP error occurred: {http_err}")
-            except Exception as e:
-                st.error(f"An error occurred: {str(e)}")
-            finally:
-                st.session_state.allow_upload = False
+from server_communication import (
+    ask_agent,
+    data_processing,
+    get_available_models,
+    get_uploaded_files,
+    FileUploader,
+)
 
 
 with st.sidebar:
@@ -96,46 +21,34 @@ with st.sidebar:
     st.header("AI Model Selection")
     if "model" not in st.session_state:
         st.session_state.model = ""
-    
-    try:
-        response = requests.get(CHATBOT_URL_AVAILABLE_MODELS)
-        available_models = response.json()["models"]
-        selected_model = st.selectbox(
-            "Choose AI Model",
-            options=available_models,
-            help="Select the AI model to use for chat",
-        )
-        
-        if selected_model != st.session_state.model:
-          st.session_state.model = selected_model
-    except Exception as e:
-        st.error(f"Could not load available models: {str(e)}")
+
+    available_models = get_available_models()
+    selected_model = st.selectbox(
+        "Choose AI Model",
+        options=available_models,
+        help="Select the AI model to use for chat",
+    )
+
+    if selected_model != st.session_state.model:
+        st.session_state.model = selected_model
 
     st.header("Document Upload")
     with st.spinner("Processing new data..."):
         FileUploader()
 
     # File Removal Section
-    st.session_state.files_to_remove = list_uploaded_files()
+    files_to_remove = get_uploaded_files()
     
-    if st.session_state.files_to_remove:
+    if files_to_remove:
         st.header("Remove Documents")
         files_to_delete = st.multiselect(
             "Select files to remove", 
-            st.session_state.files_to_remove,
+            files_to_remove,
             help="Select one or more files to delete from the uploaded documents"
         )
         
         if st.button("Remove Selected Files"):
             for file in files_to_delete:
-                # file_path = os.path.join(DOC_DIR, file)
-                # try:
-                #     os.remove(file_path)
-                #     st.session_state.files_to_remove.remove(file)
-                #     st.success(f"Removed {file}")
-                # except Exception as e:
-                #     st.error(f"Error removing {file}: {e}")
-
                 print(f"Calling remove data api for {file}")
                 data_processing(
                     "removed",
@@ -147,7 +60,7 @@ with st.sidebar:
 
     # Display Available Files Section
     st.header("Current Uploaded Documents")
-    available_files = list_uploaded_files()
+    available_files = get_uploaded_files()
     if available_files:
         for file in available_files:
             st.text(f"📄 {file}")
@@ -181,25 +94,10 @@ if prompt := st.chat_input("What do you want to know?"):
     data = {"query": prompt, "llm": st.session_state.model}
 
     with st.spinner("Searching for an answer..."):
-        try:
-            response = requests.post(CHATBOT_URL_ASK, json=data)
-            response.raise_for_status()
-
-            response_data = response.json()
-            output_text = response_data["result"]
-            sources = response_data["sources"]
-        except requests.exceptions.HTTPError as http_err:
-            if response.status_code == 404:
-                output_text = """There is no data available. Please upload your files."""
-            else:
-                output_text = f"""An error occurred while processing your message: {http_err}
-                This usually means the chatbot failed at generating a query to
-                answer your question. Please try again or rephrase your message."""
-            sources = []
-        except Exception as e:
-            output_text = f"""An unexpected error occurred: {str(e)}
-            Please try again or contact support if the problem persists."""
-            sources = []
+        output_text, sources = ask_agent(
+            prompt,
+            st.session_state.model,
+        )
 
     st.chat_message("assistant").markdown(output_text)
 
