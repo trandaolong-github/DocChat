@@ -35,13 +35,6 @@ Below is the context:
 {context}
 """
 
-# template = """Your job is to use the persentation of the code base
-# to answer all questions about it. Use the following context to answer questions.
-# Be as detailed as possible, but don't make up any information that's not from the context.
-# If you don't know an answer, say you don't know. Never answer the questions that
-# doesn't relate to the context.
-# {context}
-# """
 
 system_prompt = SystemMessagePromptTemplate(
     prompt=PromptTemplate(input_variables=["context"], template=template)
