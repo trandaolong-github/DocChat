@@ -28,3 +28,7 @@ CHATBOT_URL_AVAILABLE_MODELS = "https://<ngrok-app-domain>/available_models"
 CHATBOT_URL_UPLOADED_FILES = "https://<ngrok-app-domain>/uploaded_files"
 ```
 6. Enjoy chatting !!!
+
+
+https://github.com/user-attachments/assets/b541edcf-8240-4a25-aec1-d2619b961cca
+
