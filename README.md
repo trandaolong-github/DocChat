@@ -1,5 +1,5 @@
 # DocChat
-Chat with your document. No account, no internet required while chatting. Support docx, txt, pdf and md files
+Chat with your document. Run on your own machine. No account, no internet required while chatting. Support docx, txt, pdf and md files
 
 # How to run
 
